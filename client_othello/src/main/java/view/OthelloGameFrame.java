@@ -29,8 +29,8 @@ public class OthelloGameFrame extends JFrame implements UIListener {
 
     private static final int SIZE = 8;
     private JButton[][] board = new JButton[SIZE][SIZE];
-    private int[][] state = new int[SIZE][SIZE]; // 0=trống, 1=đen, 2=trắng
-    private int currentPlayer = 1; // 1=đen, 2=trắng
+    private int[][] state = new int[SIZE][SIZE];
+    private int currentPlayer = 1;
     private JLabel statusLabel;
     private UserDTO user;
     private int turn;
@@ -109,6 +109,51 @@ public class OthelloGameFrame extends JFrame implements UIListener {
         }
     }
 
+    private void updateTurn(int r, int c) {
+        if (checkMove(r, c)) {
+            MoveDTO moveDTO = new MoveDTO();
+            moveDTO.setCol(c);
+            moveDTO.setRow(r);
+            moveDTO.setPlayerId(user.getId());
+            Message<MoveDTO> message = new Message<>("add-move", moveDTO);
+            othelloGameController.send(message);
+        }
+    }
+
+    private boolean checkMove(int row, int col) {
+        if (state[row][col] != 0) {
+            return false; // ô đã có quân
+        }
+        boolean valid = false;
+        int opponent = (currentPlayer == 1) ? 2 : 1;
+
+        // Duyệt 8 hướng
+        int[][] directions = {
+            {-1, -1}, {-1, 0}, {-1, 1},
+            {0, -1}, {0, 1},
+            {1, -1}, {1, 0}, {1, 1}
+        };
+
+        for (int[] dir : directions) {
+            int r = row + dir[0];
+            int c = col + dir[1];
+            boolean hasOpponent = false;
+
+            // Lướt qua quân đối thủ
+            while (r >= 0 && r < SIZE && c >= 0 && c < SIZE && state[r][c] == opponent) {
+                hasOpponent = true;
+                r += dir[0];
+                c += dir[1];
+            }
+
+            // Nếu gặp quân mình sau quân đối thủ → hợp lệ
+            if (hasOpponent && r >= 0 && r < SIZE && c >= 0 && c < SIZE && state[r][c] == currentPlayer) {
+                valid = true;
+            }
+        }
+        return valid;
+    }
+    
     private void makeMove(int row, int col) {
         if (state[row][col] != 0) {
             return; // ô đã có quân
@@ -165,51 +210,6 @@ public class OthelloGameFrame extends JFrame implements UIListener {
 
             updateStatus();
         }
-    }
-
-    private void updateTurn(int r, int c) {
-        if (checkMove(r, c)) {
-            MoveDTO moveDTO = new MoveDTO();
-            moveDTO.setCol(c);
-            moveDTO.setRow(r);
-            moveDTO.setPlayerId(user.getId());
-            Message<MoveDTO> message = new Message<>("add-move", moveDTO);
-            othelloGameController.send(message);
-        }
-    }
-
-    private boolean checkMove(int row, int col) {
-        if (state[row][col] != 0) {
-            return false; // ô đã có quân
-        }
-        boolean valid = false;
-        int opponent = (currentPlayer == 1) ? 2 : 1;
-
-        // Duyệt 8 hướng
-        int[][] directions = {
-            {-1, -1}, {-1, 0}, {-1, 1},
-            {0, -1}, {0, 1},
-            {1, -1}, {1, 0}, {1, 1}
-        };
-
-        for (int[] dir : directions) {
-            int r = row + dir[0];
-            int c = col + dir[1];
-            boolean hasOpponent = false;
-
-            // Lướt qua quân đối thủ
-            while (r >= 0 && r < SIZE && c >= 0 && c < SIZE && state[r][c] == opponent) {
-                hasOpponent = true;
-                r += dir[0];
-                c += dir[1];
-            }
-
-            // Nếu gặp quân mình sau quân đối thủ → hợp lệ
-            if (hasOpponent && r >= 0 && r < SIZE && c >= 0 && c < SIZE && state[r][c] == currentPlayer) {
-                valid = true;
-            }
-        }
-        return valid;
     }
 
     private boolean hasValidMove(int player) {
