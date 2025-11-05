@@ -16,6 +16,7 @@ public class UserDTO {
     private String password;
     private String email;
     private int eloRating;
+    private boolean status;
 
     public UserDTO() {
     }
@@ -58,6 +59,14 @@ public class UserDTO {
 
     public void setEloRating(int eloRating) {
         this.eloRating = eloRating;
+    }
+
+    public boolean isStatus() {
+        return status;
+    }
+
+    public void setStatus(boolean status) {
+        this.status = status;
     }
 
 }

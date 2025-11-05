@@ -1,5 +1,6 @@
 package com.example.server_othello.network;
 
+import com.example.server_othello.dto.GameDTO;
 import com.example.server_othello.dto.Message;
 import com.example.server_othello.dto.UserDTO;
 import com.example.server_othello.model.Game;
@@ -75,41 +76,64 @@ public class MainSocketHandler extends TextWebSocketHandler {
         }
         if(mess.getType().equals("accept-challenge")) {
             UserDTO userDTO = JsonUtils.convert(mess.getData(), UserDTO.class);
-            int id=userIDWithSessionID.get(session.getId());
-            for(int id2 : userDTOs.keySet()) {
-                if(id2!=id&&id2!=userDTO.getId()) {
-                    Message<String> message1 = new Message<>();
-                    message1.setType("update-status");
-                    message1.setData(id+" "+userDTO.getId());
-                    String json = JsonUtils.toJson(message1);
-                    userSessions.get(id2).sendMessage(new TextMessage(json));
-                }
+            if(userDTOs.get(userDTO.getId())==null){
+                Message<UserDTO> message1 = new Message<>("user-exited", userDTO);
+                String json = JsonUtils.toJson(message1);
+                session.sendMessage(new TextMessage(json));
             }
-            //tạo 1 game mới
-            Game game=new Game();
-            game.setStartTime(LocalDateTime.now());
-            game.setPlayerBlack(userService.getUserById(userDTO.getId()).orElse(null));
-            game.setPlayerWhite(userService.getUserById(id).orElse(null));
-            gameService.createGame(game);
-            gameRegistry.getGames().put(userDTO.getId(), game);
-            gameRegistry.getGames().put(id, game);
-            Message<UserDTO> message1 = new Message<>();
-            message1.setType("accept-challenge");
-            message1.setData(userDTOs.get(id));
-            String json = JsonUtils.toJson(message1);
-            userSessions.get(userDTO.getId()).sendMessage(new TextMessage(json));
-            Message<UserDTO> message2 = new Message<>();
-            message2.setType("to-accept-challenge");
-            message2.setData(userDTO);
-            String json2 = JsonUtils.toJson(message2);
-            session.sendMessage(new TextMessage(json2));
+            else {
+                int id = userIDWithSessionID.get(session.getId());
+                userDTOs.get(id).setStatus(false);
+                userDTOs.get(userDTO.getId()).setStatus(false);
+                for (int id2 : userDTOs.keySet()) {
+                    if (id2 != id && id2 != userDTO.getId()) {
+                        Message<String> message1 = new Message<>();
+                        message1.setType("update-status");
+                        message1.setData(id + " " + userDTO.getId());
+                        String json = JsonUtils.toJson(message1);
+                        userSessions.get(id2).sendMessage(new TextMessage(json));
+                    }
+                }
+                //tạo 1 game mới
+                Game game = new Game();
+                game.setStartTime(LocalDateTime.now());
+                game.setPlayerBlack(userService.getUserById(userDTO.getId()).orElse(null));
+                game.setPlayerWhite(userService.getUserById(id).orElse(null));
+                gameService.createGame(game);
+                gameRegistry.getGames().put(userDTO.getId(), game);
+                gameRegistry.getGames().put(id, game);
+                GameDTO gameDTO = new GameDTO();
+                gameDTO.setPlayerWhiteID(id);
+                gameDTO.setPlayerBlackID(userDTO.getId());
+                int board[][]=new int[8][8];
+                board[3][3] = 2;
+                board[3][4] = 1;
+                board[4][3] = 1;
+                board[4][4] = 2;
+                gameDTO.setBoard(board);
+                gameDTO.setCurrentPlayerID(1);
+                gameRegistry.getGameDTOMap().put(id, gameDTO);
+                gameRegistry.getGameDTOMap().put(userDTO.getId(), gameDTO);
+                Message<UserDTO> message1 = new Message<>();
+                message1.setType("accept-challenge");
+                message1.setData(userDTOs.get(id));
+                String json = JsonUtils.toJson(message1);
+                userSessions.get(userDTO.getId()).sendMessage(new TextMessage(json));
+                Message<UserDTO> message2 = new Message<>();
+                message2.setType("to-accept-challenge");
+                message2.setData(userDTO);
+                String json2 = JsonUtils.toJson(message2);
+                session.sendMessage(new TextMessage(json2));
+            }
         }
         if(mess.getType().equals("decline-challenge")){
-            UserDTO userDTO = JsonUtils.convert(mess.getData(), UserDTO.class);;
-            int id=userIDWithSessionID.get(session.getId());
-            Message<UserDTO> message1 = new Message<>("decline-challenge", userDTOs.get(id));
-            String json = JsonUtils.toJson(message1);
-            userSessions.get(userDTO.getId()).sendMessage(new TextMessage(json));
+            UserDTO userDTO = JsonUtils.convert(mess.getData(), UserDTO.class);
+            if(userDTOs.get(userDTO.getId())!=null){
+                int id=userIDWithSessionID.get(session.getId());
+                Message<UserDTO> message1 = new Message<>("decline-challenge", userDTOs.get(id));
+                String json = JsonUtils.toJson(message1);
+                userSessions.get(userDTO.getId()).sendMessage(new TextMessage(json));
+            }
         }
         if(mess.getType().equals("user-exit")) {
             UserDTO userDTO = JsonUtils.convert(mess.getData(), UserDTO.class);

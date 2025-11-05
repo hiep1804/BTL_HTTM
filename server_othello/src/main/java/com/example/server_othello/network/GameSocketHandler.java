@@ -20,6 +20,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,80 +53,63 @@ public class GameSocketHandler extends TextWebSocketHandler {
         }
         if(mess.getType().equals("add-move")) {
             MoveDTO moveDTO = JsonUtils.convert(mess.getData(), MoveDTO.class);
-            Game game=gameRegistry.getGames().get(moveDTO.getPlayerId());
-            User user=userService.getUserById(moveDTO.getPlayerId()).orElse(null);
-            Move move=new Move();
-            move.setGame(game);
-            move.setUser(user);
-            move.setRowIndex(moveDTO.getRow());
-            move.setCol(moveDTO.getCol());
-            moveService.createMove(move);
-            Message<MoveDTO> message1=new Message<>();
-            message1.setType("update-turn");
-            if(game.getPlayerBlack().getId()==user.getId()) {
+            int r=moveDTO.getRow();
+            int c=moveDTO.getCol();
+            int turn=gameRegistry.getGameDTOMap().get(moveDTO.getPlayerId()).getPlayerBlackID()==moveDTO.getPlayerId()?1:2;
+            int board[][]=gameRegistry.getGameDTOMap().get(moveDTO.getPlayerId()).getBoard();
+            int currentPlayer=gameRegistry.getGameDTOMap().get(moveDTO.getPlayerId()).getCurrentPlayerID();
+            System.out.println(turn+" "+currentPlayer);
+            if(checkMove(r,c,board,currentPlayer)&&turn==currentPlayer) {
+                makeMove(r,c,session,moveDTO,board,currentPlayer);
+                Game game=gameRegistry.getGames().get(moveDTO.getPlayerId());
+                User user=userService.getUserById(moveDTO.getPlayerId()).orElse(null);
+                Move move=new Move();
+                move.setGame(game);
+                move.setUser(user);
+                move.setRowIndex(moveDTO.getRow());
+                move.setCol(moveDTO.getCol());
+                moveService.createMove(move);
+                Message<MoveDTO> message1=new Message<>();
+                message1.setType("update-turn");
                 message1.setData(moveDTO);
-                String json=JsonUtils.toJson(message1);
-                userSessions.get(game.getPlayerWhite().getId()).sendMessage(new TextMessage(json));
+                Message<MoveDTO> message2=new Message<>();
+                message2.setType("update-turn");
+                message2.setData(moveDTO);
+                String json1=JsonUtils.toJson(message1);
+                String json2=JsonUtils.toJson(message2);
+                userSessions.get(game.getPlayerWhite().getId()).sendMessage(new TextMessage(json1));
+                userSessions.get(game.getPlayerBlack().getId()).sendMessage(new TextMessage(json2));
+                currentPlayer=(currentPlayer==1)?2:1;
+                gameRegistry.getGameDTOMap().get(game.getPlayerWhite().getId()).setCurrentPlayerID(currentPlayer);
+                gameRegistry.getGameDTOMap().get(game.getPlayerBlack().getId()).setCurrentPlayerID(currentPlayer);
             }
             else{
-                message1.setData(moveDTO);
-                String json=JsonUtils.toJson(message1);
-                userSessions.get(game.getPlayerBlack().getId()).sendMessage(new TextMessage(json));
+                Message<String> message2=new Message<>("move-error","Nước đi không hợp lệ");
+                String json=JsonUtils.toJson(message2);
+                session.sendMessage(new TextMessage(json));
             }
-        }
-        if(mess.getType().equals("sent-result-game")) {
-            GameDTO gameDTO = JsonUtils.convert(mess.getData(), GameDTO.class);
-            gameDTO.setEndTime(LocalDateTime.now());
-            if(gameDTO.getPlayerBlackId()==0){
-                User user=userService.getUserById(gameDTO.getPlayerWhiteId()).orElse(null);
-                Game game=gameRegistry.getGames().get(user.getId());
-                game.setPlayerWhite(user);
-                game.setScoreBlack(gameDTO.getScoreBlack());
-                game.setScoreWhite(gameDTO.getScoreWhite());
-                game.setEndTime(gameDTO.getEndTime());
-                if(gameDTO.getPlayerWinnerId()!=0){
-                    user.setEloRating(user.getEloRating()+1);
-                    userService.updateUser(user.getId(), user);
-                    game.setPlayerWinner(user);
+            for(int i=0;i<8;i++) {
+                for(int j=0;j<8;j++) {
+                    System.out.print(gameRegistry.getGameDTOMap().get(moveDTO.getPlayerId()).getBoard()[i][j]+" ");
                 }
-                gameService.updateGame(game.getId(), game);
-            }
-            if(gameDTO.getPlayerWhiteId()==0){
-                User user=userService.getUserById(gameDTO.getPlayerBlackId()).orElse(null);
-                Game game=gameRegistry.getGames().get(user.getId());
-                game.setPlayerBlack(user);
-                game.setScoreBlack(gameDTO.getScoreBlack());
-                game.setScoreWhite(gameDTO.getScoreWhite());
-                game.setEndTime(gameDTO.getEndTime());
-                if(gameDTO.getPlayerWinnerId()!=0){
-                    user.setEloRating(user.getEloRating()+1);
-                    userService.updateUser(user.getId(), user);
-                    game.setPlayerWinner(user);
-                }
-                gameService.updateGame(game.getId(), game);
+                System.out.println();
             }
         }
         if(mess.getType().equals("user-exit")) {
             LocalDateTime end=LocalDateTime.now();
-            GameDTO gameDTO = JsonUtils.convert(mess.getData(), GameDTO.class);
-            int id=0;
-            Game game=null;
+            UserDTO userDTO1 = JsonUtils.convert(mess.getData(), UserDTO.class);
+            Game game=gameRegistry.getGames().get(userDTO1.getId());
             User user=null;
             User user_exit=null;
-            if(gameDTO.getPlayerBlackId()!=0){
-                id=gameDTO.getPlayerBlackId();
-                game=gameRegistry.getGames().get(id);
-                user=game.getPlayerWhite();
-                game.setPlayerWinner(game.getPlayerWhite());
-                user_exit=game.getPlayerBlack();
-            }
-            else{
-                id=gameDTO.getPlayerWhiteId();
-                game=gameRegistry.getGames().get(id);
-                game.setPlayerWinner(game.getPlayerBlack());
+            if(game.getPlayerWhite().getId()==userDTO1.getId()) {
                 user=game.getPlayerBlack();
                 user_exit=game.getPlayerWhite();
             }
+            else{
+                user=game.getPlayerWhite();
+                user_exit=game.getPlayerBlack();
+            }
+            game.setPlayerWinner(user);
             game.setEndTime(end);
             gameService.updateGame(game.getId(), game);
             user.setEloRating(user.getEloRating()+1);
@@ -155,5 +139,147 @@ public class GameSocketHandler extends TextWebSocketHandler {
     @Override
     public boolean supportsPartialMessages() {
         return false; // Không chia nhỏ message
+    }
+    private boolean checkMove(int row,int col,int board[][],int currentPlayer){
+        if (board[row][col] != 0) {
+            return false; // ô đã có quân
+        }
+        boolean valid = false;
+        int opponent = (currentPlayer == 1) ? 2 : 1;
+
+        // Duyệt 8 hướng
+        int[][] directions = {
+                {-1, -1}, {-1, 0}, {-1, 1},
+                {0, -1}, {0, 1},
+                {1, -1}, {1, 0}, {1, 1}
+        };
+
+        for (int[] dir : directions) {
+            int r = row + dir[0];
+            int c = col + dir[1];
+            boolean hasOpponent = false;
+
+            // Lướt qua quân đối thủ
+            while (r >= 0 && r < 8 && c >= 0 && c < 8 && board[r][c] == opponent) {
+                hasOpponent = true;
+                r += dir[0];
+                c += dir[1];
+            }
+
+            // Nếu gặp quân mình sau quân đối thủ → hợp lệ
+            if (hasOpponent && r >= 0 && r < 8 && c >= 0 && c < 8 && board[r][c] == currentPlayer) {
+                valid = true;
+            }
+        }
+        return valid;
+    }
+    private void makeMove(int row, int col,WebSocketSession session,MoveDTO moveDTO,int board[][],int currentPlayer) throws IOException {
+        if (board[row][col] != 0) {
+            return; // ô đã có quân
+        }
+        boolean valid = false;
+        int opponent = (currentPlayer == 1) ? 2 : 1;
+
+        // Duyệt 8 hướng
+        int[][] directions = {
+                {-1, -1}, {-1, 0}, {-1, 1},
+                {0, -1}, {0, 1},
+                {1, -1}, {1, 0}, {1, 1}
+        };
+
+        for (int[] dir : directions) {
+            int r = row + dir[0];
+            int c = col + dir[1];
+            boolean hasOpponent = false;
+
+            // Lướt qua quân đối thủ
+            while (r >= 0 && r < 8 && c >= 0 && c < 8 && board[r][c] == opponent) {
+                hasOpponent = true;
+                r += dir[0];
+                c += dir[1];
+            }
+
+            // Nếu gặp quân mình sau quân đối thủ → hợp lệ
+            if (hasOpponent && r >= 0 && r < 8 && c >= 0 && c < 8 && board[r][c] == currentPlayer) {
+                valid = true;
+                // Lật lại các quân đối thủ trên đường đi
+                r = row + dir[0];
+                c = col + dir[1];
+                while (board[r][c] == opponent) {
+                    board[r][c] = currentPlayer;
+                    r += dir[0];
+                    c += dir[1];
+                }
+            }
+        }
+
+        if (valid) {
+            board[row][col] = currentPlayer;
+            currentPlayer = (currentPlayer == 1) ? 2 : 1;
+            if(!hasValidMove(currentPlayer,board)){
+                currentPlayer = (currentPlayer == 1) ? 2 : 1;
+                if(!hasValidMove(currentPlayer,board)){
+                    showResult(session,moveDTO,board);
+                }
+                else{
+                    Message<MoveDTO> message1=new Message<>();
+                    message1.setType("change-turn");
+                    String json=JsonUtils.toJson(message1);
+                    Game game=gameRegistry.getGames().get(moveDTO.getPlayerId());
+                    userSessions.get(game.getPlayerWhite().getId()).sendMessage(new TextMessage(json));
+                    userSessions.get(game.getPlayerBlack().getId()).sendMessage(new TextMessage(json));
+                }
+            }
+        }
+    }
+    private boolean hasValidMove(int player,int board[][]) {
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (board[i][j] == 0 && checkMove(i, j,board,player)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    private void showResult(WebSocketSession session,MoveDTO moveDTO,int board[][]) throws IOException {
+        int black = 0, white = 0;
+        for (int[] row : board) {
+            for (int cell : row) {
+                if (cell == 1) {
+                    black++;
+                }
+                if (cell == 2) {
+                    white++;
+                }
+            }
+        }
+        Game game=gameRegistry.getGames().get(moveDTO.getPlayerId());
+        game.setEndTime(LocalDateTime.now());
+        game.setScoreBlack(black);
+        game.setScoreWhite(white);
+        if(black>white){
+            game.setPlayerWinner(game.getPlayerBlack());
+            Message<String> message1 = new Message<>();
+            Message<String> message2 = new Message<>();
+            message1.setType("game-end");
+            message2.setType("game-end");
+            message1.setData("Bạn đã chiến thắng!");
+            message2.setData("Bạn đã thua!");
+            userSessions.get(game.getPlayerBlack().getId()).sendMessage(new TextMessage(JsonUtils.toJson(message1)));
+            userSessions.get(game.getPlayerWhite().getId()).sendMessage(new TextMessage(JsonUtils.toJson(message2)));
+        }
+        if(white>black){
+            game.setPlayerWinner(game.getPlayerWhite());
+            Message<String> message1 = new Message<>();
+            Message<String> message2 = new Message<>();
+            message1.setType("game-end");
+            message2.setType("game-end");
+            message1.setData("Bạn đã chiến thắng!");
+            message2.setData("Bạn đã thua!");
+            userSessions.get(game.getPlayerBlack().getId()).sendMessage(new TextMessage(JsonUtils.toJson(message2)));
+            userSessions.get(game.getPlayerWhite().getId()).sendMessage(new TextMessage(JsonUtils.toJson(message1)));
+        }
+        gameService.updateGame(game.getId(), game);
     }
 }

@@ -11,10 +11,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class GameDTO {
-    private int scoreBlack;
-    private int scoreWhite;
-    private LocalDateTime endTime;
-    private int playerWinnerId;
-    private int playerBlackId;
-    private int playerWhiteId;
+    private int playerBlackID;
+    private int playerWhiteID;
+    private int board[][];
+    private int currentPlayerID;
 }

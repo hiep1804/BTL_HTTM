@@ -83,7 +83,7 @@ public class OthelloGameFrame extends JFrame implements UIListener {
         if (turn == 1) {
             s = "Lượt của bạn (●)";
         } else {
-            s = "Lượt của đối thủ (○)";
+            s = "Lượt của đối thủ (●)";
         }
         statusLabel = new JLabel(s, SwingConstants.CENTER);
         statusLabel.setFont(new Font("Arial", Font.BOLD, 18));
@@ -105,53 +105,16 @@ public class OthelloGameFrame extends JFrame implements UIListener {
     private void handleClick(int row, int col) {
         if (turn == currentPlayer) {
             updateTurn(row, col);
-            makeMove(row, col);
         }
     }
 
     private void updateTurn(int r, int c) {
-        if (checkMove(r, c)) {
-            MoveDTO moveDTO = new MoveDTO();
-            moveDTO.setCol(c);
-            moveDTO.setRow(r);
-            moveDTO.setPlayerId(user.getId());
-            Message<MoveDTO> message = new Message<>("add-move", moveDTO);
-            othelloGameController.send(message);
-        }
-    }
-
-    private boolean checkMove(int row, int col) {
-        if (state[row][col] != 0) {
-            return false; // ô đã có quân
-        }
-        boolean valid = false;
-        int opponent = (currentPlayer == 1) ? 2 : 1;
-
-        // Duyệt 8 hướng
-        int[][] directions = {
-            {-1, -1}, {-1, 0}, {-1, 1},
-            {0, -1}, {0, 1},
-            {1, -1}, {1, 0}, {1, 1}
-        };
-
-        for (int[] dir : directions) {
-            int r = row + dir[0];
-            int c = col + dir[1];
-            boolean hasOpponent = false;
-
-            // Lướt qua quân đối thủ
-            while (r >= 0 && r < SIZE && c >= 0 && c < SIZE && state[r][c] == opponent) {
-                hasOpponent = true;
-                r += dir[0];
-                c += dir[1];
-            }
-
-            // Nếu gặp quân mình sau quân đối thủ → hợp lệ
-            if (hasOpponent && r >= 0 && r < SIZE && c >= 0 && c < SIZE && state[r][c] == currentPlayer) {
-                valid = true;
-            }
-        }
-        return valid;
+        MoveDTO moveDTO = new MoveDTO();
+        moveDTO.setCol(c);
+        moveDTO.setRow(r);
+        moveDTO.setPlayerId(user.getId());
+        Message<MoveDTO> message = new Message<>("add-move", moveDTO);
+        othelloGameController.send(message);
     }
     
     private void makeMove(int row, int col) {
@@ -198,29 +161,8 @@ public class OthelloGameFrame extends JFrame implements UIListener {
             state[row][col] = currentPlayer;
             currentPlayer = (currentPlayer == 1) ? 2 : 1;
             updateBoard();
-
-            if (!hasValidMove(currentPlayer)) {
-                currentPlayer = (currentPlayer == 1) ? 2 : 1;
-                if (!hasValidMove(currentPlayer)) {
-                    showResult();
-                } else {
-                    JOptionPane.showMessageDialog(this, "Không có nước đi hợp lệ! Đổi lượt!");
-                }
-            }
-
             updateStatus();
         }
-    }
-
-    private boolean hasValidMove(int player) {
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (state[i][j] == 0 && checkMove(i, j)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private void updateBoard() {
@@ -254,70 +196,8 @@ public class OthelloGameFrame extends JFrame implements UIListener {
         statusLabel.setText(String.format("Lượt của %s | Đen: %d - Trắng: %d", s, black, white));
     }
 
-    private void showResult() {
-        int black = 0, white = 0;
-        for (int[] row : state) {
-            for (int cell : row) {
-                if (cell == 1) {
-                    black++;
-                }
-                if (cell == 2) {
-                    white++;
-                }
-            }
-        }
-
-        String msg = String.format("Kết thúc!\nĐen: %d - Trắng: %d\n", black, white);
-        GameDTO gameDTO = new GameDTO();
-        if (turn == 1) {
-            gameDTO.setPlayerBlackId(user.getId());
-            gameDTO.setPlayerWhiteId(0);
-            gameDTO.setPlayerWinnerId(0);
-        } else {
-            gameDTO.setPlayerWhiteId(user.getId());
-            gameDTO.setPlayerBlackId(0);
-            gameDTO.setPlayerWinnerId(0);
-        }
-        gameDTO.setScoreBlack(black);
-        gameDTO.setScoreWhite(white);
-        if (black > white) {
-            msg += "Người chơi Đen thắng!";
-            if (turn == 1) {
-                gameDTO.setPlayerWinnerId(user.getId());
-            }
-        } else if (white > black) {
-            msg += "Người chơi Trắng thắng!";
-            if (turn == 2) {
-                gameDTO.setPlayerWinnerId(user.getId());
-            }
-        } else {
-            msg += "Hòa!";
-        }
-        JOptionPane.showMessageDialog(this, msg);
-        Message<GameDTO> message = new Message<>("sent-result-game", gameDTO);
-        othelloGameController.send(message);
-        new MainPlayerFrame(user);
-        dispose();
-    }
-
     private void exitGame() {
-        int black = 0, white = 0;
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (state[i][j] == 1) {
-                    black++;
-                } else {
-                    white++;
-                }
-            }
-        }
-        GameDTO gameDTO = new GameDTO();
-        if (turn == 1) {
-            gameDTO.setPlayerBlackId(user.getId());
-        } else {
-            gameDTO.setPlayerWhiteId(user.getId());
-        }
-        Message<GameDTO> message = new Message<>("user-exit", gameDTO);
+        Message<UserDTO> message = new Message<>("user-exit", user);
         othelloGameController.send(message);
     }
 
@@ -329,11 +209,26 @@ public class OthelloGameFrame extends JFrame implements UIListener {
             int c = moveDTO.getCol();
             makeMove(r, c);
         }
+        if(type.equals("change-turn")){
+            currentPlayer = (currentPlayer == 1) ? 2 : 1;
+            JOptionPane.showMessageDialog(this, "Bạn không có nước đi hợp lệ!");
+            updateStatus();
+        }
+        if(type.equals("game-end")){
+            String msg=(String) obj;
+            JOptionPane.showMessageDialog(this, msg);
+            new MainPlayerFrame(user);
+            dispose();
+        }
         if (type.equals("user-exit")) {
             UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
             JOptionPane.showMessageDialog(this, "Người chơi " + userDTO.getUsername() + " đã thoát!");
             new MainPlayerFrame(user);
             dispose();
+        }
+        if(type.equals("move-error")){
+            String s=(String)obj;
+            JOptionPane.showMessageDialog(this, s);
         }
     }
 

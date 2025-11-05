@@ -16,6 +16,7 @@ public class UserDTO {
     private String password;
     private String email;
     private int eloRating;
+    private boolean status;
     public String toString(){
         return id + " " + username + " " + password + " " + email + " " + eloRating;
     }

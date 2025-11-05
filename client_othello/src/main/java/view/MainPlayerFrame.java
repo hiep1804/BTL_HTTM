@@ -34,6 +34,8 @@ public class MainPlayerFrame extends JFrame implements UIListener {
     private JButton btnInvites;
     private JLabel lblInviteCount;
     private JLabel lblNotification;
+    private JDialog dialog;
+    private JPanel listPanel;
 
     private java.util.List<Invite> invites = new ArrayList<>();
     private UserDTO user;
@@ -42,6 +44,7 @@ public class MainPlayerFrame extends JFrame implements UIListener {
 
     public MainPlayerFrame(UserDTO user) {
         this.user = user;
+        user.setStatus(true);
         initUI();
         mainPlayerController = new MainPlayerController(this);
         mainPlayerController.connect();
@@ -59,11 +62,11 @@ public class MainPlayerFrame extends JFrame implements UIListener {
         lblNotification.setBackground(new Color(0, 0, 0, 170)); // nền đen trong suốt
         lblNotification.setForeground(Color.WHITE);
         lblNotification.setBounds(50, 30, 300, 40);
-        lblNotification.setVisible(false); 
+        lblNotification.setVisible(false);
         add(lblNotification);
 
         // Tiêu đề
-        JLabel lblTitle = new JLabel("Danh sách người chơi online", SwingConstants.CENTER);
+        JLabel lblTitle = new JLabel("Danh sách người chơi online của " + user.getUsername(), SwingConstants.CENTER);
         lblTitle.setFont(new Font("Arial", Font.BOLD, 18));
         add(lblTitle, BorderLayout.NORTH);
 
@@ -97,6 +100,9 @@ public class MainPlayerFrame extends JFrame implements UIListener {
             }
         });
         setVisible(true);
+        dialog = new JDialog(this, "Danh sách lời mời", true);
+        dialog.setVisible(false);
+        listPanel = new JPanel();
     }
 
     private void addPlayer(UserDTO user) {
@@ -111,15 +117,28 @@ public class MainPlayerFrame extends JFrame implements UIListener {
         Message<UserDTO> message = new Message<>("challenge", user);
         mainPlayerController.send(message);
     }
+    
+    private void addIntite(Invite invite){
+        invites.add(invite);
+        listPanel.add(invite);
+        dialog.revalidate();
+        dialog.repaint();
+    }
 
     private void removeInvite(Invite invite) {
         invites.remove(invite);
+        listPanel.remove(invite);
         updateInviteCount();
+        dialog.revalidate();
+        dialog.repaint();
     }
 
     private void removeAllInvites() {
         invites.clear();
+        listPanel.removeAll();
         updateInviteCount();
+        dialog.revalidate();
+        dialog.repaint();
     }
 
     private void updateInviteCount() {
@@ -129,30 +148,16 @@ public class MainPlayerFrame extends JFrame implements UIListener {
 
     // Hiển thị Dialog danh sách lời mời
     private void showInviteDialog() {
-        if (invites.isEmpty()) {
-            return;
-        }
 
-        JDialog dialog = new JDialog(this, "Danh sách lời mời", true);
+        dialog = new JDialog(this, "Danh sách lời mời", true);
         dialog.setSize(300, 300);
         dialog.setLocationRelativeTo(this);
         dialog.setLayout(new BorderLayout(5, 5));
 
-        // Panel danh sách lời mời
-        JPanel listPanel = new JPanel();
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
 
         for (Invite invite : new ArrayList<>(invites)) { // copy để tránh ConcurrentModification
-            JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            JLabel lbl = new JLabel("Lời mời từ: " + invite.user.getUsername());
-            JButton btnAccept = new JButton("Đồng ý");
-            btnAccept.addActionListener(e -> acceptInvite(invite, dialog));
-            JButton btnDecline = new JButton("Từ chối");
-            btnDecline.addActionListener(e -> declineInvite(invite, dialog));
-            p.add(lbl);
-            p.add(btnAccept);
-            p.add(btnDecline);
-            listPanel.add(p);
+            listPanel.add(invite);
         }
 
         JScrollPane scrollPane = new JScrollPane(listPanel);
@@ -164,7 +169,6 @@ public class MainPlayerFrame extends JFrame implements UIListener {
             declineAllInvite(dialog);
         });
         dialog.add(btnDeclineAll, BorderLayout.SOUTH);
-
         dialog.setVisible(true);
     }
 
@@ -172,27 +176,24 @@ public class MainPlayerFrame extends JFrame implements UIListener {
     public void acceptInvite(Invite invite, JDialog dialog) {
         removeInvite(invite);
         dialog.dispose();
-        Message<UserDTO> message = new Message<>("accept-challenge", invite.user);
+        Message<UserDTO> message = new Message<>("accept-challenge", invite.userDTO);
         mainPlayerController.send(message);
     }
 
     //gửi lời từ chối
     public void declineInvite(Invite invite, JDialog dialog) {
         removeInvite(invite);
-        dialog.dispose();
-        Message<UserDTO> message = new Message<>("decline-challenge", invite.user);
+        Message<UserDTO> message = new Message<>("decline-challenge", invite.userDTO);
         mainPlayerController.send(message);
-        showInviteDialog();
     }
 
     //từ chối tất cả
     public void declineAllInvite(JDialog dialog) {
         for (Invite invite : invites) {
-            Message<UserDTO> message = new Message<>("decline-challenge", invite.user);
+            Message<UserDTO> message = new Message<>("decline-challenge", invite.userDTO);
             mainPlayerController.send(message);
         }
         removeAllInvites();
-        dialog.dispose();
     }
 
     //nhận thông báo và hiển thị
@@ -201,7 +202,7 @@ public class MainPlayerFrame extends JFrame implements UIListener {
             String s = notifications.get(0);
             lblNotification.setText(s);
             lblNotification.setVisible(true);
-            javax.swing.Timer timer=new javax.swing.Timer(1000, e->{
+            javax.swing.Timer timer = new javax.swing.Timer(1000, e -> {
                 lblNotification.setVisible(false);
                 notifications.remove(0);
                 showNotification();
@@ -229,7 +230,8 @@ public class MainPlayerFrame extends JFrame implements UIListener {
 
                     for (PlayerPanel player : playerPanels) {
                         if (userDTO.getId() == player.userDTO.getId()) {
-                            player.btnChallenge.setEnabled(true);
+                            player.btnChallenge.setVisible(true);
+                            player.lblStatus.setText("Đang rảnh");
                         }
                     }
 
@@ -247,8 +249,29 @@ public class MainPlayerFrame extends JFrame implements UIListener {
         }
         if (type.equals("challenge")) {
             UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
-            invites.add(new Invite(userDTO));
-            updateInviteCount();
+            boolean check=true;
+            for(int i=0;i<invites.size();i++){
+                if(invites.get(i).userDTO.getId()==userDTO.getId()){
+                    check=false;
+                }
+            }
+            if(check){
+                Invite invite=new Invite(userDTO);
+                invites.add(invite);
+                listPanel.add(invite);
+                dialog.revalidate();
+                dialog.repaint();
+                updateInviteCount();
+            }
+        }
+        //nếu đối thủ đã thoát
+        if (type.equals("user-exited")) {
+            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
+            if (dialog.isVisible()) {
+                JOptionPane.showMessageDialog(dialog, "Người chơi " + userDTO.getUsername() + " đã thoát!", "Thông báo", JOptionPane.WARNING_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "Người chơi " + userDTO.getUsername() + " đã thoát!");
+            }
         }
         //nếu là người thách đấu
         if (type.equals("accept-challenge")) {
@@ -267,8 +290,8 @@ public class MainPlayerFrame extends JFrame implements UIListener {
             UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
             notifications.add(userDTO.getUsername() + " đã từ chối!");
             javax.swing.Timer timer = null;
-            if(timer==null||timer.isRunning()){
-                timer=new javax.swing.Timer(0, e->showNotification());
+            if (timer == null || timer.isRunning()) {
+                timer = new javax.swing.Timer(0, e -> showNotification());
                 timer.setRepeats(false);
                 timer.start();
             }
@@ -283,10 +306,15 @@ public class MainPlayerFrame extends JFrame implements UIListener {
 
                 for (PlayerPanel player : playerPanels) {
                     if (id1 == player.userDTO.getId() || id2 == player.userDTO.getId()) {
-                        player.btnChallenge.setEnabled(false);
+                        player.btnChallenge.setVisible(false);
+                        player.lblStatus.setText("Đã vào trận");
                     }
                 }
-
+                for (Invite invite : invites) {
+                    if (invite.userDTO.getId() == id1 || invite.userDTO.getId() == id2) {
+                        JOptionPane.showMessageDialog(this, invite.userDTO.getUsername() + " đã vào game và từ chối lời mời của bạn!");
+                    }
+                }
                 playerListPanel.revalidate();
                 playerListPanel.repaint();
             });
@@ -327,34 +355,70 @@ public class MainPlayerFrame extends JFrame implements UIListener {
     private class PlayerPanel extends JPanel {
 
         private JLabel lblName;
+        private JLabel lblStatus;
         private JButton btnChallenge;
         private UserDTO userDTO;
 
         public PlayerPanel(UserDTO user) {
             this.userDTO = user;
             setLayout(new BorderLayout());
-            setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+            setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
             setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY));
 
-            lblName = new JLabel("  " + user.getUsername());
-            lblName.setFont(new Font("Arial", Font.PLAIN, 14));
-            add(lblName, BorderLayout.WEST);
+            // Tạo panel con để chứa 2 label chồng lên nhau
+            JPanel infoPanel = new JPanel();
+            infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+            infoPanel.setOpaque(false); // giữ trong suốt nếu muốn đồng màu nền với cha
 
+            lblName = new JLabel("  " + user.getUsername());
+            lblName.setFont(new Font("Arial", Font.BOLD, 14));
+
+            lblStatus = new JLabel("");
+            lblStatus.setFont(new Font("Arial", Font.ITALIC, 12));
+            lblStatus.setForeground(Color.GRAY);
+
+            // Thêm 2 label vào infoPanel
+            infoPanel.add(lblName);
+            infoPanel.add(lblStatus);
+
+            // Thêm infoPanel vào bên trái
+            add(infoPanel, BorderLayout.WEST);
+
+            // Nút "Thách đấu" ở bên phải
             btnChallenge = new JButton("Thách đấu");
             btnChallenge.setFont(new Font("Arial", Font.PLAIN, 13));
             btnChallenge.setFocusable(false);
             add(btnChallenge, BorderLayout.EAST);
+            
             btnChallenge.addActionListener(e -> sentChallengeToServer(user));
+            if(user.isStatus())      lblStatus.setText("Đang rảnh");
+            else{
+                lblStatus.setText("Đã vào trận");
+                btnChallenge.setVisible(false);
+            }
         }
     }
 
     // Lưu thông tin lời mời
-    private static class Invite {
+    private class Invite extends JPanel {
 
-        UserDTO user;
+        private JLabel lbl;
+        private JButton btnAccept;
+        private JButton btnDecline;
+
+        private UserDTO userDTO;
 
         public Invite(UserDTO user) {
-            this.user = user;
+            this.userDTO = user;
+            setLayout(new FlowLayout(FlowLayout.LEFT));
+            JLabel lbl = new JLabel("Lời mời từ: " + user.getUsername());
+            JButton btnAccept = new JButton("Đồng ý");
+            btnAccept.addActionListener(e -> acceptInvite(this, dialog));
+            JButton btnDecline = new JButton("Từ chối");
+            btnDecline.addActionListener(e -> declineInvite(this, dialog));
+            add(lbl);
+            add(btnAccept);
+            add(btnDecline);
         }
     }
 }
