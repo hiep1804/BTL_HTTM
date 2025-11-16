@@ -4,7 +4,7 @@
  */
 package network;
 
-import dto.Message;
+import model.Message;
 import jakarta.websocket.ClientEndpoint;
 import jakarta.websocket.CloseReason;
 import jakarta.websocket.ContainerProvider;

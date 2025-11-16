@@ -2,15 +2,13 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package dto;
-
-import java.time.LocalDateTime;
+package model;
 
 /**
  *
  * @author hn235
  */
-public class UserDTO {
+public class User {
     private int id;
     private String username;
     private String password;
@@ -18,7 +16,7 @@ public class UserDTO {
     private int eloRating;
     private boolean status;
 
-    public UserDTO() {
+    public User() {
     }
 
     public int getId() {

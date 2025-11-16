@@ -4,8 +4,7 @@
  */
 package controller;
 
-import dto.LoginBeanDTO;
-import dto.UserDTO;
+import model.User;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -34,9 +33,9 @@ public class LoginController {
                 JOptionPane.showMessageDialog(loginFrame, "Vui lòng nhập đủ thông tin!");
                 return;
             }
-            LoginBeanDTO loginBeanDTO = new LoginBeanDTO();
-            loginBeanDTO.setUsername(username);
-            loginBeanDTO.setPassword(password);
+            User user = new User();
+            user.setUsername(username);
+            user.setPassword(password);
             HttpClient client = HttpClient.newBuilder()
                     .version(HttpClient.Version.HTTP_2)
                     .connectTimeout(Duration.ofSeconds(10))
@@ -44,7 +43,7 @@ public class LoginController {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://localhost:8080/login"))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(loginBeanDTO.objectToJSON()))
+                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtils.toJson(user)))
                     .build();
             try {
                 HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -52,7 +51,7 @@ public class LoginController {
                     //hiển thị thông báo
                     JOptionPane.showMessageDialog(loginFrame, "Đăng nhập thành công");
                     //chuyển chuỗi json thành đối tượng
-                    UserDTO userDTO=JsonUtils.fromJson(response.body(), UserDTO.class);
+                    User userDTO=JsonUtils.fromJson(response.body(), User.class);
                     new MainPlayerFrame(userDTO);
                     loginFrame.dispose();
                 }

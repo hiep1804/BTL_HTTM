@@ -42,4 +42,9 @@ public class Game {
     // Quan hệ với Moves
     @OneToMany(mappedBy = "game", cascade = CascadeType.ALL)
     private List<Move> moves;
+
+    @Transient
+    private int[][] board;
+    @Transient
+    private int currentPlayerID;
 }

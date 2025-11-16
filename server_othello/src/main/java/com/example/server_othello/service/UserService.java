@@ -1,6 +1,5 @@
 package com.example.server_othello.service;
 
-import com.example.server_othello.dto.LoginBeanDTO;
 import com.example.server_othello.model.User;
 import com.example.server_othello.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +44,7 @@ public class UserService {
     public void deleteUser(int id) {
         userRepository.deleteById(id);
     }
-    public User findUserByLoginBeanDTO(LoginBeanDTO loginBeanDTO) {
+    public User findUserByLoginBeanDTO(User loginBeanDTO) {
         return userRepository.findUserByUsernameAndPassword(loginBeanDTO.getUsername(), loginBeanDTO.getPassword());
     }
 }

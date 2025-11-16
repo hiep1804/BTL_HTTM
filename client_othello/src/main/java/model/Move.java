@@ -2,19 +2,19 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package dto;
+package model;
 
 /**
  *
  * @author hn235
  */
-public class MoveDTO {
+public class Move {
     private int id;
-    private int row;
+    private int rowIndex;
     private int col;
     private int playerId;
 
-    public MoveDTO() {
+    public Move() {
     }
 
     public int getId() {
@@ -25,12 +25,12 @@ public class MoveDTO {
         this.id = id;
     }
 
-    public int getRow() {
-        return row;
+    public int getRowIndex() {
+        return rowIndex;
     }
 
-    public void setRow(int row) {
-        this.row = row;
+    public void setRowIndex(int rowIndex) {
+        this.rowIndex = rowIndex;
     }
 
     public int getCol() {

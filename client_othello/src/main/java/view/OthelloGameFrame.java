@@ -9,10 +9,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import controller.MainPlayerController;
 import controller.OthelloGameController;
 import controller.UIListener;
-import dto.GameDTO;
-import dto.Message;
-import dto.MoveDTO;
-import dto.UserDTO;
+import model.Message;
+import model.Move;
+import model.User;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -32,12 +31,12 @@ public class OthelloGameFrame extends JFrame implements UIListener {
     private int[][] state = new int[SIZE][SIZE];
     private int currentPlayer = 1;
     private JLabel statusLabel;
-    private UserDTO user;
+    private User user;
     private int turn;
     private OthelloGameController othelloGameController;
     private MainPlayerController mainPlayerController;
 
-    public OthelloGameFrame(UserDTO user, int turn) {
+    public OthelloGameFrame(User user, int turn) {
         this.user = user;
         this.turn = turn;
         othelloGameController = new OthelloGameController(this);
@@ -93,7 +92,7 @@ public class OthelloGameFrame extends JFrame implements UIListener {
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent e) {
                 exitGame();
-                Message<UserDTO> message = new Message<>("user-exit", user);
+                Message<User> message = new Message<>("user-exit", user);
                 mainPlayerController.send(message);
                 System.exit(0);
             }
@@ -109,11 +108,11 @@ public class OthelloGameFrame extends JFrame implements UIListener {
     }
 
     private void updateTurn(int r, int c) {
-        MoveDTO moveDTO = new MoveDTO();
-        moveDTO.setCol(c);
-        moveDTO.setRow(r);
-        moveDTO.setPlayerId(user.getId());
-        Message<MoveDTO> message = new Message<>("add-move", moveDTO);
+        Move move = new Move();
+        move.setCol(c);
+        move.setRowIndex(r);
+        move.setPlayerId(user.getId());
+        Message<Move> message = new Message<>("add-move", move);
         othelloGameController.send(message);
     }
     
@@ -197,16 +196,16 @@ public class OthelloGameFrame extends JFrame implements UIListener {
     }
 
     private void exitGame() {
-        Message<UserDTO> message = new Message<>("user-exit", user);
+        Message<User> message = new Message<>("user-exit", user);
         othelloGameController.send(message);
     }
 
     @Override
     public void onDataUpdated(String type, Object obj) {
         if (type.equals("update-turn")) {
-            MoveDTO moveDTO = JsonUtils.convert(obj, MoveDTO.class);
-            int r = moveDTO.getRow();
-            int c = moveDTO.getCol();
+            Move move = JsonUtils.convert(obj, Move.class);
+            int r = move.getRowIndex();
+            int c = move.getCol();
             makeMove(r, c);
         }
         if(type.equals("change-turn")){
@@ -221,8 +220,8 @@ public class OthelloGameFrame extends JFrame implements UIListener {
             dispose();
         }
         if (type.equals("user-exit")) {
-            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
-            JOptionPane.showMessageDialog(this, "Người chơi " + userDTO.getUsername() + " đã thoát!");
+            User user = JsonUtils.convert(obj, User.class);
+            JOptionPane.showMessageDialog(this, "Người chơi " + user.getUsername() + " đã thoát!");
             new MainPlayerFrame(user);
             dispose();
         }
@@ -234,7 +233,7 @@ public class OthelloGameFrame extends JFrame implements UIListener {
 
     @Override
     public void onConnectedToServer() {
-        Message<UserDTO> message = new Message<>("new-player", user);
+        Message<User> message = new Message<>("new-player", user);
         othelloGameController.send(message);
     }
 

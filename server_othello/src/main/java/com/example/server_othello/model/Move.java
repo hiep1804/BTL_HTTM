@@ -1,5 +1,6 @@
 package com.example.server_othello.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,13 +21,15 @@ public class Move {
     private int rowIndex;
     private int col;
 
-    // Quan hệ với Game
+    @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "game_id", nullable = false)
     private Game game;
 
-    // Quan hệ với User
+    @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+    @Transient
+    private int playerId;
 }

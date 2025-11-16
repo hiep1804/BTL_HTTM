@@ -5,14 +5,14 @@
 package controller;
 
 
-import dto.Message;
-import dto.UserDTO;
+import model.Message;
+import model.User;
 import network.WebSocketClientManager;
 import util.JsonUtils;
 import view.MainPlayerFrame;
 
-import dto.Message;
-import dto.UserDTO;
+import model.Message;
+import model.User;
 import network.ConnectionListener;
 import network.WebSocketClientManager;
 import util.JsonUtils;

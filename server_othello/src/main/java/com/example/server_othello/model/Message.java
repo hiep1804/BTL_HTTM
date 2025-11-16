@@ -1,4 +1,4 @@
-package com.example.server_othello.dto;
+package com.example.server_othello.model;
 
 public class Message<T> {
     private String type;

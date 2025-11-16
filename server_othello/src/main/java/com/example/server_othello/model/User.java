@@ -1,5 +1,6 @@
 package com.example.server_othello.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -31,17 +32,21 @@ public class User {
     @Column(nullable = false)
     private Integer eloRating;
 
-    // Mối quan hệ với Games (playerBlack, playerWhite, playerWinner)
+    @JsonIgnore
     @OneToMany(mappedBy = "playerBlack", cascade = CascadeType.ALL)
     private List<Game> gamesAsBlack;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "playerWhite", cascade = CascadeType.ALL)
     private List<Game> gamesAsWhite;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "playerWinner", cascade = CascadeType.ALL)
     private List<Game> gamesWon;
 
-    // Mối quan hệ với Moves
+    @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<Move> moves;
+    @Transient
+    private boolean status;
 }

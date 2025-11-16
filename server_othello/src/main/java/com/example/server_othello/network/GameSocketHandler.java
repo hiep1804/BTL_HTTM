@@ -1,9 +1,6 @@
 package com.example.server_othello.network;
 
-import com.example.server_othello.dto.GameDTO;
-import com.example.server_othello.dto.Message;
-import com.example.server_othello.dto.MoveDTO;
-import com.example.server_othello.dto.UserDTO;
+import com.example.server_othello.model.Message;
 import com.example.server_othello.model.Game;
 import com.example.server_othello.model.Move;
 import com.example.server_othello.model.User;
@@ -11,9 +8,7 @@ import com.example.server_othello.service.GameService;
 import com.example.server_othello.service.MoveService;
 import com.example.server_othello.service.UserService;
 import com.example.server_othello.util.JsonUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -47,41 +42,42 @@ public class GameSocketHandler extends TextWebSocketHandler {
         System.out.println("Message from " + session.getId() + ": " + message.getPayload());
         Message<?> mess = JsonUtils.fromJson(message.getPayload(), Message.class);
         if(mess.getType().equals("new-player")) {
-            UserDTO userDTO = JsonUtils.convert(mess.getData(), UserDTO.class);
-            userSessions.put(userDTO.getId(), session);
-            userIDWithSessionID.put(session.getId(), userDTO.getId());
+            User user = JsonUtils.convert(mess.getData(), User.class);
+            userSessions.put(user.getId(), session);
+            userIDWithSessionID.put(session.getId(), user.getId());
         }
         if(mess.getType().equals("add-move")) {
-            MoveDTO moveDTO = JsonUtils.convert(mess.getData(), MoveDTO.class);
-            int r=moveDTO.getRow();
-            int c=moveDTO.getCol();
-            int turn=gameRegistry.getGameDTOMap().get(moveDTO.getPlayerId()).getPlayerBlackID()==moveDTO.getPlayerId()?1:2;
-            int board[][]=gameRegistry.getGameDTOMap().get(moveDTO.getPlayerId()).getBoard();
-            int currentPlayer=gameRegistry.getGameDTOMap().get(moveDTO.getPlayerId()).getCurrentPlayerID();
+            Move move = JsonUtils.convert(mess.getData(), Move.class);
+            int r=move.getRowIndex();
+            int c=move.getCol();
+            int turn=gameRegistry.getGames().get(move.getPlayerId()).getPlayerBlack().getId()==move.getPlayerId()?1:2;
+            int board[][]=gameRegistry.getGames().get(move.getPlayerId()).getBoard();
+            int currentPlayer=gameRegistry.getGames().get(move.getPlayerId()).getCurrentPlayerID();
             System.out.println(turn+" "+currentPlayer);
             if(checkMove(r,c,board,currentPlayer)&&turn==currentPlayer) {
-                makeMove(r,c,session,moveDTO,board,currentPlayer);
-                Game game=gameRegistry.getGames().get(moveDTO.getPlayerId());
-                User user=userService.getUserById(moveDTO.getPlayerId()).orElse(null);
-                Move move=new Move();
-                move.setGame(game);
-                move.setUser(user);
-                move.setRowIndex(moveDTO.getRow());
-                move.setCol(moveDTO.getCol());
-                moveService.createMove(move);
-                Message<MoveDTO> message1=new Message<>();
+                makeMove(r,c,session,move,board,currentPlayer);
+                Game game=gameRegistry.getGames().get(move.getPlayerId());
+                User user=userService.getUserById(move.getPlayerId()).orElse(null);
+                //tạo move mới khi thỏa mãn tất cả điều kiện
+                Move move1=new Move();
+                move1.setGame(game);
+                move1.setUser(user);
+                move1.setRowIndex(move.getRowIndex());
+                move1.setCol(move.getCol());
+                moveService.createMove(move1);
+                Message<Move> message1=new Message<>();
                 message1.setType("update-turn");
-                message1.setData(moveDTO);
-                Message<MoveDTO> message2=new Message<>();
+                message1.setData(move);
+                Message<Move> message2=new Message<>();
                 message2.setType("update-turn");
-                message2.setData(moveDTO);
+                message2.setData(move);
                 String json1=JsonUtils.toJson(message1);
                 String json2=JsonUtils.toJson(message2);
                 userSessions.get(game.getPlayerWhite().getId()).sendMessage(new TextMessage(json1));
                 userSessions.get(game.getPlayerBlack().getId()).sendMessage(new TextMessage(json2));
                 currentPlayer=(currentPlayer==1)?2:1;
-                gameRegistry.getGameDTOMap().get(game.getPlayerWhite().getId()).setCurrentPlayerID(currentPlayer);
-                gameRegistry.getGameDTOMap().get(game.getPlayerBlack().getId()).setCurrentPlayerID(currentPlayer);
+                gameRegistry.getGames().get(game.getPlayerWhite().getId()).setCurrentPlayerID(currentPlayer);
+                gameRegistry.getGames().get(game.getPlayerBlack().getId()).setCurrentPlayerID(currentPlayer);
             }
             else{
                 Message<String> message2=new Message<>("move-error","Nước đi không hợp lệ");
@@ -90,38 +86,33 @@ public class GameSocketHandler extends TextWebSocketHandler {
             }
             for(int i=0;i<8;i++) {
                 for(int j=0;j<8;j++) {
-                    System.out.print(gameRegistry.getGameDTOMap().get(moveDTO.getPlayerId()).getBoard()[i][j]+" ");
+                    System.out.print(gameRegistry.getGames().get(move.getPlayerId()).getBoard()[i][j]+" ");
                 }
                 System.out.println();
             }
         }
         if(mess.getType().equals("user-exit")) {
             LocalDateTime end=LocalDateTime.now();
-            UserDTO userDTO1 = JsonUtils.convert(mess.getData(), UserDTO.class);
-            Game game=gameRegistry.getGames().get(userDTO1.getId());
-            User user=null;
-            User user_exit=null;
-            if(game.getPlayerWhite().getId()==userDTO1.getId()) {
-                user=game.getPlayerBlack();
-                user_exit=game.getPlayerWhite();
+            User user1 = JsonUtils.convert(mess.getData(), User.class);
+            Game game=gameRegistry.getGames().get(user1.getId());
+            User userWinner=null;
+            User userExit=null;
+            if(game.getPlayerWhite().getId()==user1.getId()) {
+                userWinner=game.getPlayerBlack();
+                userExit=game.getPlayerWhite();
             }
             else{
-                user=game.getPlayerWhite();
-                user_exit=game.getPlayerBlack();
+                userWinner=game.getPlayerWhite();
+                userExit=game.getPlayerBlack();
             }
-            game.setPlayerWinner(user);
+            game.setPlayerWinner(userWinner);
             game.setEndTime(end);
             gameService.updateGame(game.getId(), game);
-            user.setEloRating(user.getEloRating()+1);
-            userService.updateUser(user.getId(), user);
-            UserDTO userDTO=new UserDTO();
-            userDTO.setId(user_exit.getId());
-            userDTO.setUsername(user_exit.getUsername());
-            userDTO.setPassword(user_exit.getPassword());
-            userDTO.setEmail(user_exit.getEmail());
-            Message<UserDTO> message1=new Message<>("user-exit",userDTO);
+            userWinner.setEloRating(userWinner.getEloRating()+1);
+            userService.updateUser(userWinner.getId(), userWinner);
+            Message<User> message1=new Message<>("user-exit",userExit);
             String json=JsonUtils.toJson(message1);
-            userSessions.get(user.getId()).sendMessage(new TextMessage(json));
+            userSessions.get(userWinner.getId()).sendMessage(new TextMessage(json));
         }
     }
 
@@ -138,7 +129,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
     @Override
     public boolean supportsPartialMessages() {
-        return false; // Không chia nhỏ message
+        return false;
     }
     private boolean checkMove(int row,int col,int board[][],int currentPlayer){
         if (board[row][col] != 0) {
@@ -173,7 +164,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
         }
         return valid;
     }
-    private void makeMove(int row, int col,WebSocketSession session,MoveDTO moveDTO,int board[][],int currentPlayer) throws IOException {
+    private void makeMove(int row, int col,WebSocketSession session,Move move,int board[][],int currentPlayer) throws IOException {
         if (board[row][col] != 0) {
             return; // ô đã có quân
         }
@@ -219,13 +210,13 @@ public class GameSocketHandler extends TextWebSocketHandler {
             if(!hasValidMove(currentPlayer,board)){
                 currentPlayer = (currentPlayer == 1) ? 2 : 1;
                 if(!hasValidMove(currentPlayer,board)){
-                    showResult(session,moveDTO,board);
+                    showResult(session,move,board);
                 }
                 else{
-                    Message<MoveDTO> message1=new Message<>();
+                    Message<Move> message1=new Message<>();
                     message1.setType("change-turn");
                     String json=JsonUtils.toJson(message1);
-                    Game game=gameRegistry.getGames().get(moveDTO.getPlayerId());
+                    Game game=gameRegistry.getGames().get(move.getPlayerId());
                     userSessions.get(game.getPlayerWhite().getId()).sendMessage(new TextMessage(json));
                     userSessions.get(game.getPlayerBlack().getId()).sendMessage(new TextMessage(json));
                 }
@@ -242,7 +233,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
         }
         return false;
     }
-    private void showResult(WebSocketSession session,MoveDTO moveDTO,int board[][]) throws IOException {
+    private void showResult(WebSocketSession session,Move move,int board[][]) throws IOException {
         int black = 0, white = 0;
         for (int[] row : board) {
             for (int cell : row) {
@@ -254,7 +245,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 }
             }
         }
-        Game game=gameRegistry.getGames().get(moveDTO.getPlayerId());
+        Game game=gameRegistry.getGames().get(move.getPlayerId());
         game.setEndTime(LocalDateTime.now());
         game.setScoreBlack(black);
         game.setScoreWhite(white);

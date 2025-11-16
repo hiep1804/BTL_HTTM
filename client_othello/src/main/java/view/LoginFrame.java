@@ -6,8 +6,7 @@ package view;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import controller.LoginController;
-import dto.LoginBeanDTO;
-import dto.UserDTO;
+import model.User;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;

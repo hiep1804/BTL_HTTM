@@ -4,8 +4,8 @@
  */
 package controller;
 
-import dto.Message;
-import dto.UserDTO;
+import model.Message;
+import model.User;
 import network.ConnectionListener;
 import network.MessageHandler;
 import network.WebSocketClientManager;

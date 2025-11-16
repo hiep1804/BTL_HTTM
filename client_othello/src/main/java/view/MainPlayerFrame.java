@@ -5,8 +5,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import controller.MainPlayerController;
 import controller.UIListener;
-import dto.Message;
-import dto.UserDTO;
+import model.Message;
+import model.User;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -38,11 +38,11 @@ public class MainPlayerFrame extends JFrame implements UIListener {
     private JPanel listPanel;
 
     private java.util.List<Invite> invites = new ArrayList<>();
-    private UserDTO user;
+    private User user;
     private MainPlayerController mainPlayerController;
     private java.util.List<String> notifications = new CopyOnWriteArrayList<>();
 
-    public MainPlayerFrame(UserDTO user) {
+    public MainPlayerFrame(User user) {
         this.user = user;
         user.setStatus(true);
         initUI();
@@ -94,7 +94,7 @@ public class MainPlayerFrame extends JFrame implements UIListener {
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent e) {
-                Message<UserDTO> message = new Message<>("user-exit", user);
+                Message<User> message = new Message<>("user-exit", user);
                 mainPlayerController.getWebSocketClientManager().send(message);
                 System.exit(0);
             }
@@ -105,7 +105,7 @@ public class MainPlayerFrame extends JFrame implements UIListener {
         listPanel = new JPanel();
     }
 
-    private void addPlayer(UserDTO user) {
+    private void addPlayer(User user) {
         PlayerPanel p = new PlayerPanel(user);
         playerPanels.add(p);
         playerListPanel.add(p);
@@ -113,8 +113,8 @@ public class MainPlayerFrame extends JFrame implements UIListener {
         playerListPanel.repaint();
     }
 
-    private void sentChallengeToServer(UserDTO user) {
-        Message<UserDTO> message = new Message<>("challenge", user);
+    private void sentChallengeToServer(User user) {
+        Message<User> message = new Message<>("challenge", user);
         mainPlayerController.send(message);
     }
     
@@ -176,21 +176,21 @@ public class MainPlayerFrame extends JFrame implements UIListener {
     public void acceptInvite(Invite invite, JDialog dialog) {
         removeInvite(invite);
         dialog.dispose();
-        Message<UserDTO> message = new Message<>("accept-challenge", invite.userDTO);
+        Message<User> message = new Message<>("accept-challenge", invite.user);
         mainPlayerController.send(message);
     }
 
     //gửi lời từ chối
     public void declineInvite(Invite invite, JDialog dialog) {
         removeInvite(invite);
-        Message<UserDTO> message = new Message<>("decline-challenge", invite.userDTO);
+        Message<User> message = new Message<>("decline-challenge", invite.user);
         mainPlayerController.send(message);
     }
 
     //từ chối tất cả
     public void declineAllInvite(JDialog dialog) {
         for (Invite invite : invites) {
-            Message<UserDTO> message = new Message<>("decline-challenge", invite.userDTO);
+            Message<User> message = new Message<>("decline-challenge", invite.user);
             mainPlayerController.send(message);
         }
         removeAllInvites();
@@ -215,21 +215,21 @@ public class MainPlayerFrame extends JFrame implements UIListener {
     @Override
     public void onDataUpdated(String type, Object obj) {
         if (type.equals("add-user")) {
-            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
+            User user = JsonUtils.convert(obj, User.class);
             boolean check = true;
             for (PlayerPanel playerPanel : playerPanels) {
-                if (playerPanel.userDTO.getId() == userDTO.getId()) {
+                if (playerPanel.user.getId() == user.getId()) {
                     check = false;
                     break;
                 }
             }
             if (check) {
-                addPlayer(userDTO);
+                addPlayer(user);
             } else {
                 SwingUtilities.invokeLater(() -> {
 
                     for (PlayerPanel player : playerPanels) {
-                        if (userDTO.getId() == player.userDTO.getId()) {
+                        if (user.getId() == player.user.getId()) {
                             player.btnChallenge.setVisible(true);
                             player.lblStatus.setText("Đang rảnh");
                         }
@@ -241,54 +241,51 @@ public class MainPlayerFrame extends JFrame implements UIListener {
             }
         }
         if (type.equals("load-all-user")) {
-            List<UserDTO> usersOnline = JsonUtils.convert(obj, new TypeReference<List<UserDTO>>() {
+            List<User> usersOnline = JsonUtils.convert(obj, new TypeReference<List<User>>() {
             });
-            for (UserDTO userOnline : usersOnline) {
+            for (User userOnline : usersOnline) {
                 addPlayer(userOnline);
             }
         }
         if (type.equals("challenge")) {
-            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
+            User user = JsonUtils.convert(obj, User.class);
             boolean check=true;
             for(int i=0;i<invites.size();i++){
-                if(invites.get(i).userDTO.getId()==userDTO.getId()){
+                if(invites.get(i).user.getId()==user.getId()){
                     check=false;
                 }
             }
             if(check){
-                Invite invite=new Invite(userDTO);
-                invites.add(invite);
-                listPanel.add(invite);
-                dialog.revalidate();
-                dialog.repaint();
+                Invite invite=new Invite(user);
+                addIntite(invite);
                 updateInviteCount();
             }
         }
         //nếu đối thủ đã thoát
         if (type.equals("user-exited")) {
-            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
+            User user = JsonUtils.convert(obj, User.class);
             if (dialog.isVisible()) {
-                JOptionPane.showMessageDialog(dialog, "Người chơi " + userDTO.getUsername() + " đã thoát!", "Thông báo", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(dialog, "Người chơi " + user.getUsername() + " đã thoát!", "Thông báo", JOptionPane.WARNING_MESSAGE);
             } else {
-                JOptionPane.showMessageDialog(this, "Người chơi " + userDTO.getUsername() + " đã thoát!");
+                JOptionPane.showMessageDialog(this, "Người chơi " + user.getUsername() + " đã thoát!");
             }
         }
         //nếu là người thách đấu
         if (type.equals("accept-challenge")) {
-            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
+            User user = JsonUtils.convert(obj, User.class);
             new OthelloGameFrame(user, 1);
             dispose();
         }
         //nếu là người được thách đấu
         if (type.equals("to-accept-challenge")) {
-            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
+            User user = JsonUtils.convert(obj, User.class);
             new OthelloGameFrame(user, 2);
             dispose();
         }
         //đối thủ từ chối thách đấu
         if (type.equals("decline-challenge")) {
-            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
-            notifications.add(userDTO.getUsername() + " đã từ chối!");
+            User user = JsonUtils.convert(obj, User.class);
+            notifications.add(user.getUsername() + " đã từ chối!");
             javax.swing.Timer timer = null;
             if (timer == null || timer.isRunning()) {
                 timer = new javax.swing.Timer(0, e -> showNotification());
@@ -305,14 +302,14 @@ public class MainPlayerFrame extends JFrame implements UIListener {
                 int id2 = Integer.parseInt(tmp[1]);
 
                 for (PlayerPanel player : playerPanels) {
-                    if (id1 == player.userDTO.getId() || id2 == player.userDTO.getId()) {
+                    if (id1 == player.user.getId() || id2 == player.user.getId()) {
                         player.btnChallenge.setVisible(false);
                         player.lblStatus.setText("Đã vào trận");
                     }
                 }
                 for (Invite invite : invites) {
-                    if (invite.userDTO.getId() == id1 || invite.userDTO.getId() == id2) {
-                        JOptionPane.showMessageDialog(this, invite.userDTO.getUsername() + " đã vào game và từ chối lời mời của bạn!");
+                    if (invite.user.getId() == id1 || invite.user.getId() == id2) {
+                        JOptionPane.showMessageDialog(this, invite.user.getUsername() + " đã vào game và từ chối lời mời của bạn!");
                     }
                 }
                 playerListPanel.revalidate();
@@ -320,10 +317,10 @@ public class MainPlayerFrame extends JFrame implements UIListener {
             });
         }
         if (type.equals("user-exit")) {
-            UserDTO userDTO = JsonUtils.convert(obj, UserDTO.class);
+            User user = JsonUtils.convert(obj, User.class);
             PlayerPanel p = null;
             for (int i = 0; i < playerPanels.size(); i++) {
-                if (playerPanels.get(i).userDTO.getId() == userDTO.getId()) {
+                if (playerPanels.get(i).user.getId() == user.getId()) {
                     p = playerPanels.get(i);
                     playerPanels.remove(i);
                 }
@@ -338,7 +335,7 @@ public class MainPlayerFrame extends JFrame implements UIListener {
 
     @Override
     public void onConnectedToServer() {
-        Message<UserDTO> message = new Message<>("new-user", user);
+        Message<User> message = new Message<>("new-user", user);
         mainPlayerController.send(message);
     }
 
@@ -357,10 +354,10 @@ public class MainPlayerFrame extends JFrame implements UIListener {
         private JLabel lblName;
         private JLabel lblStatus;
         private JButton btnChallenge;
-        private UserDTO userDTO;
+        private User user;
 
-        public PlayerPanel(UserDTO user) {
-            this.userDTO = user;
+        public PlayerPanel(User user) {
+            this.user = user;
             setLayout(new BorderLayout());
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
             setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY));
@@ -406,10 +403,10 @@ public class MainPlayerFrame extends JFrame implements UIListener {
         private JButton btnAccept;
         private JButton btnDecline;
 
-        private UserDTO userDTO;
+        private User user;
 
-        public Invite(UserDTO user) {
-            this.userDTO = user;
+        public Invite(User user) {
+            this.user = user;
             setLayout(new FlowLayout(FlowLayout.LEFT));
             JLabel lbl = new JLabel("Lời mời từ: " + user.getUsername());
             JButton btnAccept = new JButton("Đồng ý");
